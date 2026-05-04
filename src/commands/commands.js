@@ -1,6 +1,13 @@
 const config = require("../../config.json");
+const logger = require("../utils/logger");
 
 const prefix = config.prefix;
+
+function send(api, msg, threadID) {
+  api.sendMessage(msg, threadID)
+    .then(() => {})
+    .catch(e => logger.warn(`sendMessage خطأ [${threadID}]: ${JSON.stringify(e)}`));
+}
 
 module.exports = {
   name: "اوامر",
@@ -18,8 +25,6 @@ module.exports = {
 
     msg += `\n${"─".repeat(25)}\nالبادئة: ${prefix}`;
 
-    api.sendMessage(msg, threadID, (err) => {
-      if (err) require("../utils/logger").warn(`sendMessage خطأ: ${err?.message || err}`);
-    });
+    send(api, msg, threadID);
   }
 };
