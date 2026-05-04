@@ -1,0 +1,16 @@
+{
+  "prefix": "/",
+  "superAdminID": "YOUR_FACEBOOK_ID_HERE",
+  "botName": "Bot",
+  "language": "ar",
+  "autoReconnect": true,
+  "reconnectDelay": 5000,
+  "maxReconnectAttempts": 999,
+  "listenEvents": true,
+  "selfListen": false,
+  "logLevel": "info",
+  "appstatePath": "./appstate.json",
+  "adminDataPath": "./data/admins.json",
+  "engineDataPath": "./data/engine.json",
+  "lockDataPath": "./data/lock.json"
+}
