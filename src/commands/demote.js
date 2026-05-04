@@ -3,16 +3,22 @@ const config = require("../../config.json");
 
 const prefix = config.prefix;
 
+function send(api, msg, threadID) {
+  api.sendMessage(msg, threadID, (err) => {
+    if (err) require("../utils/logger").warn(`sendMessage خطأ: ${err?.message || err}`);
+  });
+}
+
 module.exports = {
   name: "اخفاض",
   description: "إنزال شخص من صلاحية أدمن",
   usage: `${prefix}اخفاض [الرد على الشخص أو كتابة الايدي]`,
 
-  async execute(api, event, args) {
+  execute(api, event, args) {
     const { threadID, senderID, messageReply } = event;
 
     if (!admins.isSuperAdmin(senderID)) {
-      return api.sendMessage("⛔ هذا الأمر متاح للسوبر أدمن فقط.", threadID);
+      return send(api, "⛔ هذا الأمر متاح للسوبر أدمن فقط.", threadID);
     }
 
     let targetID = null;
@@ -22,24 +28,19 @@ module.exports = {
     } else if (args[0]) {
       targetID = String(args[0]);
     } else {
-      return api.sendMessage(
-        `⚠️ يرجى الرد على رسالة الشخص أو كتابة ايديه.\nمثال: ${prefix}اخفاض 123456789`,
-        threadID
-      );
+      return send(api, `⚠️ يرجى الرد على رسالة الشخص أو كتابة ايديه.\nمثال: ${prefix}اخفاض 123456789`, threadID);
     }
 
     if (admins.isSuperAdmin(targetID)) {
-      return api.sendMessage("⛔ لا يمكن إنزال السوبر أدمن أبداً.", threadID);
+      return send(api, "⛔ لا يمكن إنزال السوبر أدمن أبداً.", threadID);
     }
 
     const result = admins.removeAdmin(targetID);
 
-    if (!result.success) {
-      if (result.reason === "not_admin") {
-        return api.sendMessage(`⚠️ هذا الشخص (${targetID}) ليس أدمناً أصلاً.`, threadID);
-      }
+    if (!result.success && result.reason === "not_admin") {
+      return send(api, `⚠️ هذا الشخص (${targetID}) ليس أدمناً أصلاً.`, threadID);
     }
 
-    return api.sendMessage(`✅ تم إنزال الشخص (${targetID}) من صلاحية أدمن.`, threadID);
+    send(api, `✅ تم إنزال الشخص (${targetID}) من صلاحية أدمن.`, threadID);
   }
 };
