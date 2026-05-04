@@ -7,7 +7,7 @@ module.exports = {
   description: "عرض قائمة الأوامر المتاحة",
   usage: `${prefix}اوامر`,
 
-  async execute(api, event, args, commandList) {
+  execute(api, event, args, commandList) {
     const { threadID } = event;
 
     let msg = `📋 قائمة الأوامر:\n${"─".repeat(25)}\n`;
@@ -18,6 +18,8 @@ module.exports = {
 
     msg += `\n${"─".repeat(25)}\nالبادئة: ${prefix}`;
 
-    return api.sendMessage(msg, threadID);
+    api.sendMessage(msg, threadID, (err) => {
+      if (err) require("../utils/logger").warn(`sendMessage خطأ: ${err?.message || err}`);
+    });
   }
 };
