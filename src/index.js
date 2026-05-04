@@ -128,47 +128,55 @@ function startBot() {
 
     setInterval(() => saveAppstate(api), 30 * 60 * 1000);
 
-    let listening = true;
-    let retryCount = 0;
+    logger.success(`البوت يعمل الآن 🤖 | البادئة: ${config.prefix}`);
 
-    function startListening() {
-      if (!listening) return;
+    async function startListening() {
+      try {
+        const emitter = await api.listenMqtt();
 
-      const stopListening = api.listenMqtt((err, event) => {
-        if (err) {
-          const errMsg = err.error || (typeof err === "string" ? err : JSON.stringify(err));
+        emitter.on("message", (event) => {
+          handleEvent(api, event);
+        });
+
+        emitter.on("error", (err) => {
+          const errMsg = err?.error || err?.message || (typeof err === "string" ? err : JSON.stringify(err));
           logger.error(`خطأ في الاستماع: ${errMsg}`);
 
-          if (errMsg === "Not logged in" || errMsg.includes("MQTT") || errMsg.includes("reconnect") || errMsg.includes("seqId")) {
-            retryCount++;
-            const retryDelay = Math.min(retryCount * 5000, 30000);
-            if (retryCount <= 5) {
-              logger.warn(`إعادة محاولة الاستماع (${retryCount}/5) بعد ${retryDelay / 1000} ثانية...`);
-              try { stopListening(); } catch (_) {}
-              setTimeout(startListening, retryDelay);
-            } else if (config.autoReconnect && listening) {
-              logger.warn("جارٍ إعادة الاتصال الكامل...");
-              listening = false;
-              retryCount = 0;
-              engineUtil.stopAllEngines();
-              try { stopListening(); } catch (_) {}
-              setTimeout(startBot, config.reconnectDelay);
-            }
-          } else {
-            logger.warn(`خطأ مؤقت، إعادة المحاولة بعد 10 ثواني...`);
-            try { stopListening(); } catch (_) {}
-            setTimeout(startListening, 10000);
-          }
-          return;
-        }
+          const isFatal = errMsg === "Not logged in"
+            || errMsg.includes("sequence")
+            || errMsg.includes("stop_listen")
+            || errMsg.includes("Connection refused");
 
-        handleEvent(api, event);
-      });
+          if (isFatal && config.autoReconnect) {
+            logger.warn("جارٍ إعادة الاتصال الكامل...");
+            engineUtil.stopAllEngines();
+            try { emitter.stop(); } catch (_) {}
+            setTimeout(startBot, config.reconnectDelay);
+          } else {
+            logger.warn("خطأ مؤقت، إعادة المحاولة بعد 15 ثانية...");
+            try { emitter.stop(); } catch (_) {}
+            setTimeout(startListening, 15000);
+          }
+        });
+
+        emitter.on("stop", () => {
+          if (config.autoReconnect) {
+            logger.warn("انقطع الاتصال، إعادة الاتصال...");
+            setTimeout(startListening, config.reconnectDelay);
+          }
+        });
+
+      } catch (err) {
+        const msg = err?.message || String(err);
+        logger.error(`فشل بدء الاستماع: ${msg}`);
+        if (config.autoReconnect) {
+          logger.warn("إعادة المحاولة بعد 10 ثواني...");
+          setTimeout(startListening, 10000);
+        }
+      }
     }
 
     startListening();
-
-    logger.success(`البوت يعمل الآن 🤖 | البادئة: ${config.prefix}`);
   });
 }
 
@@ -177,17 +185,27 @@ function handleEvent(api, event) {
 
   const { type, threadID, senderID, body } = event;
 
-  if (type === "message" || type === "message_reply") {
+
+  if (type === "message" || type === "message_reply" || type === "message_unsend") {
     engineUtil.recordActivity(threadID);
-    handleMessage(api, event);
+    if (type !== "message_unsend") handleMessage(api, event);
   }
 
-  if (type === "event") {
+  if (type === "event" || type === "typ" || type === "read_receipt") {
     const eventTypes = ["log:thread-name", "log:user-nickname", "log:subscribe", "log:unsubscribe"];
-    if (eventTypes.includes(event.logMessageType)) {
+    if (event.logMessageType && eventTypes.includes(event.logMessageType)) {
       engineUtil.recordActivity(threadID);
     }
   }
+}
+
+function normalizeArabic(text) {
+  return text
+    .replace(/[أإآا]/g, "ا")
+    .replace(/[ةت]/g, "ة")
+    .replace(/ى/g, "ي")
+    .replace(/[ؤو]/g, "و")
+    .trim();
 }
 
 function handleMessage(api, event) {
@@ -204,13 +222,23 @@ function handleMessage(api, event) {
 
   const input = body.slice(prefix.length).trim();
   const parts = input.split(/\s+/);
-  const cmdName = parts[0];
+  const rawCmdName = parts[0];
   const args = parts.slice(1);
 
-  if (!cmdName) return;
+  if (!rawCmdName) return;
 
-  const cmd = commands.get(cmdName);
+  const cmdName = normalizeArabic(rawCmdName);
+
+  let cmd = commands.get(rawCmdName) || commands.get(cmdName);
+  if (!cmd) {
+    for (const [key, val] of commands.entries()) {
+      if (normalizeArabic(key) === cmdName) { cmd = val; break; }
+    }
+  }
+
   if (!cmd) return;
+
+  logger.info(`أمر: ${rawCmdName} | من: ${senderID}`);
 
   try {
     if (cmd.name === "اوامر") {
