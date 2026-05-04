@@ -1,0 +1,45 @@
+const admins = require("../utils/admins");
+const config = require("../../config.json");
+
+const prefix = config.prefix;
+
+module.exports = {
+  name: "اخفاض",
+  description: "إنزال شخص من صلاحية أدمن",
+  usage: `${prefix}اخفاض [الرد على الشخص أو كتابة الايدي]`,
+
+  async execute(api, event, args) {
+    const { threadID, senderID, messageReply } = event;
+
+    if (!admins.isSuperAdmin(senderID)) {
+      return api.sendMessage("⛔ هذا الأمر متاح للسوبر أدمن فقط.", threadID);
+    }
+
+    let targetID = null;
+
+    if (messageReply) {
+      targetID = String(messageReply.senderID);
+    } else if (args[0]) {
+      targetID = String(args[0]);
+    } else {
+      return api.sendMessage(
+        `⚠️ يرجى الرد على رسالة الشخص أو كتابة ايديه.\nمثال: ${prefix}اخفاض 123456789`,
+        threadID
+      );
+    }
+
+    if (admins.isSuperAdmin(targetID)) {
+      return api.sendMessage("⛔ لا يمكن إنزال السوبر أدمن أبداً.", threadID);
+    }
+
+    const result = admins.removeAdmin(targetID);
+
+    if (!result.success) {
+      if (result.reason === "not_admin") {
+        return api.sendMessage(`⚠️ هذا الشخص (${targetID}) ليس أدمناً أصلاً.`, threadID);
+      }
+    }
+
+    return api.sendMessage(`✅ تم إنزال الشخص (${targetID}) من صلاحية أدمن.`, threadID);
+  }
+};
