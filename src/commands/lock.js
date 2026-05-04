@@ -1,19 +1,20 @@
 const admins = require("../utils/admins");
 const lockUtil = require("../utils/lock");
+const logger = require("../utils/logger");
 const config = require("../../config.json");
 
 const prefix = config.prefix;
 
 function send(api, msg, threadID) {
-  api.sendMessage(msg, threadID, (err) => {
-    if (err) require("../utils/logger").warn(`sendMessage خطأ: ${err?.message || err}`);
-  });
+  api.sendMessage(msg, threadID)
+    .then(() => {})
+    .catch(e => logger.warn(`sendMessage خطأ [${threadID}]: ${JSON.stringify(e)}`));
 }
 
 module.exports = {
   name: "قفل",
   description: "قفل البوت وتجاهل الأوامر",
-  usage: `${prefix}قفل [تشغيل|إيقاف|الذكي|عادي]`,
+  usage: `${prefix}قفل [الذكي|عادي] [تشغيل|إيقاف]`,
 
   execute(api, event, args) {
     const { threadID, senderID } = event;
@@ -31,10 +32,10 @@ module.exports = {
         `• الذكي (جميع الغروبات): ${status.smartLock ? "✅ مفعل" : "❌ معطل"}\n` +
         `• الغروبات المقفلة: ${status.lockedGroups.length > 0 ? status.lockedGroups.join(", ") : "لا يوجد"}\n\n` +
         `الأوامر الفرعية:\n` +
-        `${prefix}قفل الذكي تشغيل — قفل جميع الغروبات\n` +
-        `${prefix}قفل الذكي إيقاف — رفع القفل عن جميع الغروبات\n` +
-        `${prefix}قفل عادي تشغيل — قفل هذا الغروب فقط\n` +
-        `${prefix}قفل عادي إيقاف — رفع القفل عن هذا الغروب`,
+        `${prefix}قفل الذكي تشغيل\n` +
+        `${prefix}قفل الذكي إيقاف\n` +
+        `${prefix}قفل عادي تشغيل\n` +
+        `${prefix}قفل عادي إيقاف`,
         threadID
       );
     }
@@ -45,9 +46,7 @@ module.exports = {
       const enabled = toggle === "تشغيل";
       lockUtil.setSmartLock(enabled);
       return send(api,
-        enabled
-          ? `🔒 تم تفعيل القفل الذكي: البوت مقفل في جميع الغروبات.`
-          : `🔓 تم إلغاء القفل الذكي: البوت يعمل في جميع الغروبات.`,
+        enabled ? `🔒 تم تفعيل القفل الذكي.` : `🔓 تم إلغاء القفل الذكي.`,
         threadID
       );
     }
@@ -58,9 +57,7 @@ module.exports = {
       const enabled = toggle === "تشغيل";
       lockUtil.setGroupLock(threadID, enabled);
       return send(api,
-        enabled
-          ? `🔒 تم قفل البوت في هذا الغروب. سيتجاهل جميع الأوامر والرسائل.`
-          : `🔓 تم رفع القفل عن هذا الغروب.`,
+        enabled ? `🔒 تم قفل البوت في هذا الغروب.` : `🔓 تم رفع القفل عن هذا الغروب.`,
         threadID
       );
     }
