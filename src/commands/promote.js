@@ -1,12 +1,13 @@
 const admins = require("../utils/admins");
+const logger = require("../utils/logger");
 const config = require("../../config.json");
 
 const prefix = config.prefix;
 
 function send(api, msg, threadID) {
-  api.sendMessage(msg, threadID, (err) => {
-    if (err) require("../utils/logger").warn(`sendMessage خطأ: ${err?.message || err}`);
-  });
+  api.sendMessage(msg, threadID)
+    .then(() => {})
+    .catch(e => logger.warn(`sendMessage خطأ [${threadID}]: ${JSON.stringify(e)}`));
 }
 
 module.exports = {
