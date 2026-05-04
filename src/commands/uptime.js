@@ -1,7 +1,14 @@
 const config = require("../../config.json");
+const logger = require("../utils/logger");
 
 const prefix = config.prefix;
 const startTime = Date.now();
+
+function send(api, msg, threadID) {
+  api.sendMessage(msg, threadID)
+    .then(() => {})
+    .catch(e => logger.warn(`sendMessage خطأ [${threadID}]: ${JSON.stringify(e)}`));
+}
 
 module.exports = {
   name: "سيرفر",
@@ -9,7 +16,7 @@ module.exports = {
   description: "عرض معلومات البوت والسيرفر",
   usage: `${prefix}سيرفر`,
 
-  execute(api, event, args) {
+  execute(api, event) {
     const { threadID } = event;
 
     const uptimeMs = Date.now() - startTime;
@@ -29,8 +36,6 @@ module.exports = {
       `🌐 النظام: Node.js ${process.version}\n` +
       `📅 التاريخ: ${new Date().toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}`;
 
-    api.sendMessage(msg, threadID, (err) => {
-      if (err) require("../utils/logger").warn(`sendMessage خطأ: ${err?.message || err}`);
-    });
+    send(api, msg, threadID);
   }
 };
