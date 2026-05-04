@@ -9,7 +9,7 @@ module.exports = {
   description: "عرض معلومات البوت والسيرفر",
   usage: `${prefix}سيرفر`,
 
-  async execute(api, event, args) {
+  execute(api, event, args) {
     const { threadID } = event;
 
     const uptimeMs = Date.now() - startTime;
@@ -29,6 +29,8 @@ module.exports = {
       `🌐 النظام: Node.js ${process.version}\n` +
       `📅 التاريخ: ${new Date().toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}`;
 
-    return api.sendMessage(msg, threadID);
+    api.sendMessage(msg, threadID, (err) => {
+      if (err) require("../utils/logger").warn(`sendMessage خطأ: ${err?.message || err}`);
+    });
   }
 };
