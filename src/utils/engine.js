@@ -57,9 +57,9 @@ function startEngine(api) {
       return;
     }
 
-    api.sendMessage(current.message, threadID, (err) => {
-      if (err) logger.error(`محرك: فشل الإرسال: ${err.error || err}`);
-    });
+    api.sendMessage(current.message, threadID)
+      .then(() => {})
+      .catch(e => logger.warn(`محرك: فشل الإرسال [${threadID}]: ${JSON.stringify(e)}`));
   }, data.interval);
 }
 
