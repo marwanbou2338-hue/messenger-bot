@@ -240,16 +240,14 @@ function handleMessage(api, event) {
 
   logger.info(`أمر: ${rawCmdName} | من: ${senderID}`);
 
-  try {
-    if (cmd.name === "اوامر") {
-      cmd.execute(api, event, args, commandList);
-    } else {
-      cmd.execute(api, event, args);
-    }
-  } catch (e) {
-    logger.error(`خطأ في تنفيذ الأمر ${cmdName}: ${e.message}`);
-    api.sendMessage(`❌ حدث خطأ أثناء تنفيذ الأمر.`, threadID);
-  }
+  const execResult = cmd.name === "اوامر"
+    ? cmd.execute(api, event, args, commandList)
+    : cmd.execute(api, event, args);
+
+  Promise.resolve(execResult).catch(e => {
+    const msg = e?.message || (typeof e === "string" ? e : JSON.stringify(e));
+    logger.error(`خطأ في تنفيذ الأمر ${rawCmdName}: ${msg}`);
+  });
 }
 
 process.on("uncaughtException", (err) => {
