@@ -1,4 +1,4 @@
-const login = require("fca-unofficial");
+const { login } = require("ws3-fca");
 const fs = require("fs-extra");
 const path = require("path");
 const logger = require("./utils/logger");
@@ -83,10 +83,11 @@ function startBot() {
     listenEvents: config.listenEvents,
     selfListen: config.selfListen,
     logLevel: "silent",
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    forceLogin: false,
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    forceLogin: true,
     autoMarkRead: false,
-    autoMarkDelivery: false
+    autoMarkDelivery: false,
+    online: true
   };
 
   login(loginOptions, (err, api) => {
@@ -127,21 +128,45 @@ function startBot() {
 
     setInterval(() => saveAppstate(api), 30 * 60 * 1000);
 
-    const stopListening = api.listenMqtt((err, event) => {
-      if (err) {
-        logger.error(`خطأ في الاستماع: ${err.error || err}`);
+    let listening = true;
+    let retryCount = 0;
 
-        if (config.autoReconnect) {
-          logger.warn("جارٍ إعادة الاتصال...");
-          engineUtil.stopAllEngines();
-          try { stopListening(); } catch (_) {}
-          setTimeout(startBot, config.reconnectDelay);
+    function startListening() {
+      if (!listening) return;
+
+      const stopListening = api.listenMqtt((err, event) => {
+        if (err) {
+          const errMsg = err.error || (typeof err === "string" ? err : JSON.stringify(err));
+          logger.error(`خطأ في الاستماع: ${errMsg}`);
+
+          if (errMsg === "Not logged in" || errMsg.includes("MQTT") || errMsg.includes("reconnect") || errMsg.includes("seqId")) {
+            retryCount++;
+            const retryDelay = Math.min(retryCount * 5000, 30000);
+            if (retryCount <= 5) {
+              logger.warn(`إعادة محاولة الاستماع (${retryCount}/5) بعد ${retryDelay / 1000} ثانية...`);
+              try { stopListening(); } catch (_) {}
+              setTimeout(startListening, retryDelay);
+            } else if (config.autoReconnect && listening) {
+              logger.warn("جارٍ إعادة الاتصال الكامل...");
+              listening = false;
+              retryCount = 0;
+              engineUtil.stopAllEngines();
+              try { stopListening(); } catch (_) {}
+              setTimeout(startBot, config.reconnectDelay);
+            }
+          } else {
+            logger.warn(`خطأ مؤقت، إعادة المحاولة بعد 10 ثواني...`);
+            try { stopListening(); } catch (_) {}
+            setTimeout(startListening, 10000);
+          }
+          return;
         }
-        return;
-      }
 
-      handleEvent(api, event);
-    });
+        handleEvent(api, event);
+      });
+    }
+
+    startListening();
 
     logger.success(`البوت يعمل الآن 🤖 | البادئة: ${config.prefix}`);
   });
